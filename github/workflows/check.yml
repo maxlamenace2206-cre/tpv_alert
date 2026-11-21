@@ -1,0 +1,64 @@
+name: Vérifier Topivo
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # toutes les 10 min (GitHub peut avoir quelques minutes de retard)
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Enregistrer capture d'écran + HTML (1 = oui)"
+        default: "0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: topivo
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Cache navigateur Playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - run: pip install -r requirements.txt && python -m playwright install --with-deps chromium
+
+      - name: Vérification
+        env:
+          TOPIVO_EMAIL: ${{ secrets.TOPIVO_EMAIL }}
+          TOPIVO_PASSWORD: ${{ secrets.TOPIVO_PASSWORD }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          LOGIN_URL: ${{ vars.LOGIN_URL }}
+          MISSIONS_URL: ${{ vars.MISSIONS_URL }}
+          MISSION_SELECTOR: ${{ vars.MISSION_SELECTOR }}
+          DEBUG: ${{ github.event.inputs.debug }}
+        run: python monitor.py
+
+      - name: Sauvegarder l'état
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "maj état" && git push)
+
+      - name: Fichiers de debug
+        if: always() && github.event.inputs.debug == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug
+          path: debug/
+          retention-days: 1
