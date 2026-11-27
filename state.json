@@ -1,7 +1,8 @@
 {
- "error_notified": true,
+ "error_notified": false,
  "initialized": true,
  "seen": [
+  "01bccc26eae229d3",
   "35126e9a8f9efe49",
   "ad35a0fc1fbcaa4f"
  ]
